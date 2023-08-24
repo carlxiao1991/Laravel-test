@@ -2,7 +2,10 @@
 
 namespace App\Exceptions;
 
+use HttpException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\ErrorHandler\Exception\FlattenException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -37,5 +40,32 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    public function render($request, Throwable $exception)
+    {
+        $error = $this->convertExceptionToResponse($exception);
+        $data = [
+            'code' => $error->getStatusCode(),
+            'message' => $exception->getMessage(),
+            'data' => [],
+        ];
+        if ($exception instanceof HttpException) {
+            $data = [
+                'code' => 500,
+                'message' => $exception->getMessage(),
+                'data' => [],
+            ];
+            if (!config('app.debug')) {
+                $data['message'] = 'Internal Server Error';
+            }
+        }
+        if (config('app.debug')) {
+            $data['data'] = $exception->getTrace();
+        }
+        if($exception instanceof NotFoundHttpException){
+            $data['message'] = 'Not Found';
+        }
+        return response()->json($data, $error->getStatusCode());
     }
 }
